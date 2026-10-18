@@ -4,8 +4,13 @@ import json
 import uuid
 import hashlib
 
-API_KEY = st.secrets["groqAPIKey"]
+st.set_page_config(
+    page_title="Language Learning App", 
+    page_icon="🌏", 
+    layout="wide"
+)
 
+API_KEY = st.secrets["groqAPIKey"]
 client = Groq(api_key=API_KEY)
 
 def ask_groq(system_prompt, user_prompt, temperature=0.7):
@@ -15,10 +20,9 @@ def ask_groq(system_prompt, user_prompt, temperature=0.7):
             {"role": "user","content": user_prompt}
         ],
         model="openai/gpt-oss-120b",
-        temperature=temperature)
-
-    response = chat_completion.choices[0].message.content
-    return response
+        temperature=temperature
+    )
+    return chat_completion.choices[0].message.content
 
 system_prompt = '''
 You are a friendly language tutor.
@@ -29,17 +33,38 @@ Keep the output clear and practical.
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "current_user_id" not in st.session_state:
+    st.session_state.current_user_id = ""
 if "user_credentials" not in st.session_state:
     st.session_state.user_credentials = {}
+if "learner_profile" not in st.session_state:
+    st.session_state.learner_profile = {}
+if "selected_topics" not in st.session_state:
+    st.session_state.selected_topics = ""
+if "saved_vocab" not in st.session_state:
+    st.session_state.saved_vocab = []
+if "saved_grammar_explanations" not in st.session_state:
+    st.session_state.saved_grammar_explanations = []
+if "saved_grammar_examples" not in st.session_state:
+    st.session_state.saved_grammar_examples = []
+if "vocab_items" not in st.session_state:
+    st.session_state.vocab_items = []
+if "grammar_outputs" not in st.session_state:
+    st.session_state.grammar_outputs = {}
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "feedback_report" not in st.session_state:
+    st.session_state.feedback_report = {}
+if "chat_history_list" not in st.session_state:
+    st.session_state.chat_history_list = []
 
 if not st.session_state.authenticated:
     st.title("🌏 Language Learning App")
     
     tab_login, tab_signup = st.tabs(["🔐 Log In", "📝 Sign Up"])
 
-    # ---------------------------------------------------------
-    # TAB 1: User Login
-    # ---------------------------------------------------------
     with tab_login:
         st.subheader("Log In to Your Account")
         with st.form("login_form"):
@@ -63,9 +88,6 @@ if not st.session_state.authenticated:
                 else:
                     st.error("Incorrect password. Please try again.")
 
-    # ---------------------------------------------------------
-    # TAB 2: Sign Up
-    # ---------------------------------------------------------
     with tab_signup:
         st.subheader("Create a New Account")
         with st.form("signup_form"):
@@ -86,63 +108,10 @@ if not st.session_state.authenticated:
                 elif uid in st.session_state.user_credentials:
                     st.info("An account with this User ID already exists! Please switch to the 'Log In' tab.")
                 else:
-                    # Save hashed credentials
                     st.session_state.user_credentials[uid] = hash_password(pwd)
                     st.success("Account created successfully! You can now switch to the 'Log In' tab to log in.")
 
     st.stop()
-
-st.set_page_config(
-    page_title="Language Learning App", page_icon="🌏", layout="wide")
-
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-if "current_user_id" not in st.session_state:
-    st.session_state.current_user_id = ""
-
-if not st.session_state.authenticated:
-    st.title("🔐 User Login")
-    with st.form("login_form"):
-        user_id_input = st.text_input("User ID")
-        password_input = st.text_input("Password", type="password")
-        login_btn = st.form_submit_button("Log In")
-        
-        if login_btn:
-            if user_id_input.strip() and password_input.strip():
-                st.session_state.authenticated = True
-                st.session_state.current_user_id = user_id_input.strip()
-                st.success("Logged in successfully!")
-                st.rerun()
-            else:
-                st.warning("Please enter both User ID and Password.")
-    st.stop()
-
-if "learner_profile" not in st.session_state:
-    st.session_state.learner_profile = {}
-
-if "selected_topics" not in st.session_state:
-    st.session_state.selected_topics = ""
-
-if "saved_vocab" not in st.session_state:
-    st.session_state.saved_vocab = []
-
-if "saved_grammar" not in st.session_state:
-    st.session_state.saved_grammar = []
-
-if "vocab_items" not in st.session_state:
-    st.session_state.vocab_items = []
-
-if "grammar_outputs" not in st.session_state:
-    st.session_state.grammar_outputs = {}
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "feedback_report" not in st.session_state:
-    st.session_state.feedback_report = {}
-
-if "learning_focus" not in st.session_state:
-    st.session_state.learning_focus = []
 
 def generate_vocabulary():
     profile = st.session_state.learner_profile
@@ -183,11 +152,7 @@ JSON format:
     }}
 ]
 """
-    response_text = ask_groq(
-        system_prompt,
-        vocab_prompt,
-        temperature=0.4
-    ).strip()
+    response_text = ask_groq(system_prompt, vocab_prompt, temperature=0.4).strip()
 
     try:
         if response_text.startswith("```json"):
@@ -196,27 +161,21 @@ JSON format:
             response_text = response_text[:-3]
             
         vocab_items = json.loads(response_text.strip())
-    
         if isinstance(vocab_items, list):
             st.session_state.vocab_items = vocab_items
         else:
             st.error("The AI response is not a list.")
-    
     except json.JSONDecodeError:
         st.error("The AI response was not valid JSON.")
         st.code(response_text)
-        
+
 st.sidebar.header('NAVIGATION')
 st.sidebar.write(f"User: **{st.session_state.current_user_id}**")
 
 page = st.sidebar.radio(
     "Choose a page",
-    ["Home",
-    "Learner Profile",
-    "Learner Dashboard",
-    "Vocabulary Practice",
-    "Grammar Practice",
-    "Conversation Practice"])
+    ["Home", "Learner Profile", "Learner Dashboard", "Vocabulary Practice", "Grammar Practice", "Conversation Practice"]
+)
 
 if st.sidebar.button("Log Out"):
     st.session_state.authenticated = False
@@ -242,7 +201,6 @@ if page == "Home":
     st.divider()
 
     st.subheader("🚀 How to Use This App")
-    
     col1, col2 = st.columns(2)
 
     with col1:
@@ -280,24 +238,12 @@ elif page == "Learner Profile":
         st.subheader("Edit Profile Information")
 
         profile = st.session_state.learner_profile
-        purpose = st.text_input(
-        "Why do you want to learn new language?",)
-    
-        known_language = st.selectbox(
-        "What language do you want to use for learning?",
-        ["Japanese", "Spanish", "English", "French", "Korean"])
-    
-        level_known_language = st.slider(f"What is your current level for {known_language}?" , min_value=0, max_value=100, value=50, step=10)
-        
-        target_language = st.selectbox(
-        "What language do you want to learn?",
-        ["Japanese", "Spanish", "English", "French", "Korean"])
-        
-        level_target_language = st.selectbox(
-        "What is your current level?",
-        ["Beginner", "Elementary", "Intermediate","Advanced"])
-      
-        learning_focus = st.multiselect("What do you want to practice?",["Vocabulary","Grammar","Conversation"], ["Vocabulary","Grammar","Conversation"])
+        purpose = st.text_input("Why do you want to learn new language?")
+        known_language = st.selectbox("What language do you want to use for learning?", ["Japanese", "Spanish", "English", "French", "Korean"])
+        level_known_language = st.slider(f"What is your current level for {known_language}?", min_value=0, max_value=100, value=50, step=10)
+        target_language = st.selectbox("What language do you want to learn?", ["Japanese", "Spanish", "English", "French", "Korean"])
+        level_target_language = st.selectbox("What is your current level?", ["Beginner", "Elementary", "Intermediate", "Advanced"])
+        learning_focus = st.multiselect("What do you want to practice?", ["Vocabulary", "Grammar", "Conversation"], ["Vocabulary", "Grammar", "Conversation"])
     
         submitted = st.form_submit_button("Save Profile")
     
@@ -326,8 +272,8 @@ Rules:
                     "target_language": target_language,
                     "target_language_level": level_target_language,
                     "learning_focus": learning_focus,
-                    "topics": topics}
-                
+                    "topics": topics
+                }
                 st.success("Profile updated successfully!")
             else:
                 st.warning("Complete your profile before you save")
@@ -342,7 +288,7 @@ Rules:
         with col_b:
             st.metric("Target Language", profile_overview.get("target_language", "N/A"), profile_overview.get("target_language_level", "N/A"))
         with col_c:
-            st.metric("Learning Focus", ", ".join(profile_overview.get("learning_focus",[])))
+            st.metric("Learning Focus", ", ".join(profile_overview.get("learning_focus", [])))
 
         st.markdown(f"**🎯 Learning Motivation:**")
         st.info(profile_overview.get("purpose", "No purpose specified yet."))
@@ -363,18 +309,12 @@ elif page == "Learner Dashboard":
 
     target_language = profile.get("target_language", "English")
     
-    # Vocabulary Count
     total_vocab_saved = len(st.session_state.get("saved_vocab", []))
-    
-    # Directly reference saved grammar items from Grammar Practice page
     saved_explanations = st.session_state.get("saved_grammar_explanations", [])
     saved_examples = st.session_state.get("saved_grammar_examples", [])
     total_grammar_saved = len(saved_explanations) + len(saved_examples)
-    
-    # Conversation Sessions Count
     total_conversations = len(st.session_state.get("chat_history_list", []))
     
-    # 🎯 Learning Statistics Metrics
     st.subheader("🎯 Learning Statistics")
     col1, col2, col3 = st.columns(3)
     
@@ -387,7 +327,6 @@ elif page == "Learner Dashboard":
 
     st.divider()
 
-    # 📈 Progress Overview
     st.subheader("📈 Progress Overview")
     st.write(f"User ID: **{st.session_state.current_user_id}**")
     st.write(f"Studying **{target_language}** at the **{profile.get('target_language_level', 'Beginner')}** level.")
@@ -412,13 +351,11 @@ elif page == "Vocabulary Practice":
     st.title("📚 Vocabulary Practice")
 
     profile = st.session_state.learner_profile
-
     if not profile:
         st.warning("Please complete your Learner Profile first.")
         st.stop()
 
     topics = profile.get("topics", [])
-
     if not topics:
         st.warning("No topics available. Please update your Learner Profile.")
         st.stop()
@@ -426,19 +363,10 @@ elif page == "Vocabulary Practice":
     target_language = profile.get("target_language", "English")
     known_language = profile.get("known_language", "English")
 
-    # Create Tabs for New Vocab and Saved Vocab
     tab_new, tab_saved = st.tabs(["✨ Generate New", "⭐ Saved Vocabulary"])
 
-    # ---------------------------------------------------------
-    # TAB 1: Generate & Practice New Vocabulary
-    # ---------------------------------------------------------
     with tab_new:
-        selected_topic = st.selectbox(
-            "Choose a topic",
-            topics,
-            key="vocab_topic_selector"
-        )
-
+        selected_topic = st.selectbox("Choose a topic", topics, key="vocab_topic_selector")
         st.session_state.selected_topics = selected_topic
 
         if st.button("✨ Generate Vocabulary"):
@@ -450,10 +378,7 @@ elif page == "Vocabulary Practice":
         if st.session_state.vocab_items:
             st.subheader(f"Vocabulary: {st.session_state.selected_topics}")
             
-            # Extract saved word names
             saved_words = [v.get("word") for v in st.session_state.saved_vocab if isinstance(v, dict)]
-
-            # Filter out saved words so they are not shown on this tab
             unsaved_vocab_items = [
                 item for item in st.session_state.vocab_items 
                 if item.get("word") not in saved_words
@@ -477,12 +402,7 @@ elif page == "Vocabulary Practice":
                         st.write(f"**Definition:** {definition}")
                         st.write(f"**Example:** {example}")
 
-                        saved = st.checkbox(
-                            f"⭐ Save {word}",
-                            value=False,
-                            key=f"save_vocab_{word}_{index}"
-                        )
-
+                        saved = st.checkbox(f"⭐ Save {word}", value=False, key=f"save_vocab_{word}_{index}")
                         if saved:
                             if item not in st.session_state.saved_vocab:
                                 st.session_state.saved_vocab.append(item)
@@ -490,16 +410,12 @@ elif page == "Vocabulary Practice":
         else:
             st.info("Click **Generate Vocabulary** to create your vocabulary cards.")
 
-    # ---------------------------------------------------------
-    # TAB 2: Review Saved Vocabulary
-    # ---------------------------------------------------------
     with tab_saved:
         st.subheader(f"⭐ Saved Vocabulary Words ({len(st.session_state.saved_vocab)})")
 
         if not st.session_state.saved_vocab:
             st.info("You haven't saved any vocabulary items yet! Generate words in the other tab and check the star box to save them.")
         else:
-            # Iterate through a copy so items can be safely removed
             for idx, item in enumerate(list(st.session_state.saved_vocab), start=1):
                 word = item.get("word", "")
                 reading = item.get("reading", "")
@@ -508,16 +424,13 @@ elif page == "Vocabulary Practice":
 
                 with st.container(border=True):
                     col_info, col_action = st.columns([0.85, 0.15])
-                    
                     with col_info:
                         if reading:
                             st.markdown(f"### {idx}. {word} <small style='color: gray;'>({known_language} Reading: {reading})</small>", unsafe_allow_html=True)
                         else:
                             st.markdown(f"### {idx}. {word}")
-
                         st.write(f"**Definition:** {definition}")
                         st.write(f"**Example:** {example}")
-
                     with col_action:
                         if st.button("🗑️ Remove", key=f"remove_saved_tab_{word}_{idx}"):
                             st.session_state.saved_vocab.remove(item)
@@ -527,13 +440,11 @@ elif page == "Grammar Practice":
     st.title("📖 Grammar Practice")
     
     profile = st.session_state.learner_profile
-
     if not profile:
         st.warning("Please complete your Learner Profile first.")
         st.stop()
 
     topics = profile.get("topics", [])
-
     if not topics:
         st.warning("No topics available in your profile. Please update your Learner Profile first.")
         st.stop()
@@ -542,45 +453,28 @@ elif page == "Grammar Practice":
     known_language = profile.get("known_language", "English")
     level = profile.get("target_language_level", "Beginner")
 
-    # Initialize separate saved lists in session_state if not present
     if "saved_grammar_explanations" not in st.session_state:
         st.session_state.saved_grammar_explanations = []
     if "saved_grammar_examples" not in st.session_state:
         st.session_state.saved_grammar_examples = []
 
-    # Navigation Tabs
     tab_practice, tab_saved_exp, tab_saved_ex = st.tabs([
-        "✨ Practice", 
-        "⭐ Saved Explanations", 
-        "⭐ Saved Examples"
+        "✨ Practice", "⭐ Saved Explanations", "⭐ Saved Examples"
     ])
 
-    # ---------------------------------------------------------
-    # TAB 1: Practice & Generation
-    # ---------------------------------------------------------
     with tab_practice:
         st.write(f"**Target Language:** {target_language} | **Level:** {level}")
         st.divider()
 
-        # Text input as the basis for concept explanation
         previous_topic = st.session_state.get("current_grammar_input", "")
-        grammar_concept = st.text_input(
-            "Enter exact grammar concept to learn (e.g., Past Tense, Conditional, Articles):",
-            value=previous_topic,
-            key="grammar_concept_text_input"
-        )
+        grammar_concept = st.text_input("Enter exact grammar concept to learn (e.g., Past Tense, Conditional, Articles):", value=previous_topic, key="grammar_concept_text_input")
 
         if grammar_concept != previous_topic:
             st.session_state["current_grammar_input"] = grammar_concept
             st.session_state.pop("current_explanation", None)
             st.session_state.pop("current_examples", None)
 
-        # Situational topic selected from Learner Profile for examples only
-        situational_topic = st.selectbox(
-            "Select situational topic for examples (derived from your Profile):",
-            topics,
-            key="situational_topic_selector"
-        )
+        situational_topic = st.selectbox("Select situational topic for examples (derived from your Profile):", topics, key="situational_topic_selector")
 
         st.divider()
 
@@ -597,7 +491,6 @@ elif page == "Grammar Practice":
             st.session_state.pop("current_examples", None)
             st.rerun()
 
-        # Explain Concept based on Text Input
         if explain_clicked:
             if not grammar_concept.strip():
                 st.warning("Please enter a grammar concept above first.")
@@ -613,20 +506,17 @@ Return ONLY valid JSON with no markdown formatting or backticks:
 }}
 """
                     response_text = ask_groq(system_prompt, explanation_prompt, temperature=0.5).strip()
-
                     try:
                         if response_text.startswith("```json"):
                             response_text = response_text[7:]
                         if response_text.endswith("```"):
                             response_text = response_text[:-3]
-                        
                         parsed_output = json.loads(response_text.strip())
                         st.session_state.current_explanation = parsed_output.get("explanation", "")
                     except json.JSONDecodeError:
                         st.error("The AI response was not valid JSON.")
                         st.code(response_text)
 
-        # Generate Examples combining Grammar Concept + Selected Situational Topic
         if examples_clicked:
             if not grammar_concept.strip():
                 st.warning("Please enter a grammar concept above first.")
@@ -649,20 +539,17 @@ Return ONLY valid JSON with no markdown formatting or backticks:
 }}
 """
                     response_text = ask_groq(system_prompt, examples_prompt, temperature=0.5).strip()
-
                     try:
                         if response_text.startswith("```json"):
                             response_text = response_text[7:]
                         if response_text.endswith("```"):
                             response_text = response_text[:-3]
-                        
                         parsed_output = json.loads(response_text.strip())
                         st.session_state.current_examples = parsed_output.get("examples", [])
                     except json.JSONDecodeError:
                         st.error("The AI response was not valid JSON.")
                         st.code(response_text)
 
-        # --- Display & Save Explanation ---
         if st.session_state.get("current_explanation"):
             st.subheader(f"💡 Concept Explanation: {grammar_concept}")
             with st.container(border=True):
@@ -671,12 +558,7 @@ Return ONLY valid JSON with no markdown formatting or backticks:
             saved_concepts = [e.get("concept") for e in st.session_state.saved_grammar_explanations if isinstance(e, dict)]
             is_exp_saved = grammar_concept in saved_concepts
 
-            save_exp_checkbox = st.checkbox(
-                f"⭐ Save Explanation for: {grammar_concept}",
-                value=is_exp_saved,
-                key=f"save_exp_{grammar_concept}"
-            )
-
+            save_exp_checkbox = st.checkbox(f"⭐ Save Explanation for: {grammar_concept}", value=is_exp_saved, key=f"save_exp_{grammar_concept}")
             exp_item = {
                 "concept": grammar_concept,
                 "target_language": target_language,
@@ -688,12 +570,10 @@ Return ONLY valid JSON with no markdown formatting or backticks:
                 st.rerun()
             elif not save_exp_checkbox and is_exp_saved:
                 st.session_state.saved_grammar_explanations = [
-                    e for e in st.session_state.saved_grammar_explanations 
-                    if e.get("concept") != grammar_concept
+                    e for e in st.session_state.saved_grammar_explanations if e.get("concept") != grammar_concept
                 ]
                 st.rerun()
 
-        # --- Display & Save Examples ---
         if st.session_state.get("current_examples"):
             st.subheader(f"📝 Contextual Examples ({grammar_concept} — Topic: {situational_topic})")
 
@@ -707,19 +587,12 @@ Return ONLY valid JSON with no markdown formatting or backticks:
                         st.markdown(f"**Example {idx}:** {sentence} <small style='color: gray;'>(Pronunciation: {furigana})</small>", unsafe_allow_html=True)
                     else:
                         st.markdown(f"**Example {idx}:** {sentence}")
-                        
                     st.write(f"*Translation:* {translation}")
 
-                    # Check if sentence is already saved
                     saved_sentences = [s.get("sentence") for s in st.session_state.saved_grammar_examples if isinstance(s, dict)]
                     is_ex_saved = sentence in saved_sentences
 
-                    save_ex_cb = st.checkbox(
-                        f"⭐ Save Example {idx}",
-                        value=is_ex_saved,
-                        key=f"save_ex_{grammar_concept}_{idx}"
-                    )
-
+                    save_ex_cb = st.checkbox(f"⭐ Save Example {idx}", value=is_ex_saved, key=f"save_ex_{grammar_concept}_{idx}")
                     ex_item = {
                         "concept": grammar_concept,
                         "topic": situational_topic,
@@ -733,24 +606,18 @@ Return ONLY valid JSON with no markdown formatting or backticks:
                         st.rerun()
                     elif not save_ex_cb and is_ex_saved:
                         st.session_state.saved_grammar_examples = [
-                            s for s in st.session_state.saved_grammar_examples 
-                            if s.get("sentence") != sentence
+                            s for s in st.session_state.saved_grammar_examples if s.get("sentence") != sentence
                         ]
                         st.rerun()
 
-    # ---------------------------------------------------------
-    # TAB 2: Saved Grammar Explanations
-    # ---------------------------------------------------------
     with tab_saved_exp:
         st.subheader(f"⭐ Saved Explanations ({len(st.session_state.saved_grammar_explanations)})")
-
         if not st.session_state.saved_grammar_explanations:
             st.info("No explanations saved yet. Generate an explanation in the Practice tab and check the star box to save it.")
         else:
             for idx, item in enumerate(list(st.session_state.saved_grammar_explanations), start=1):
                 concept = item.get("concept", "")
                 explanation = item.get("explanation", "")
-
                 with st.container(border=True):
                     col_info, col_action = st.columns([0.85, 0.15])
                     with col_info:
@@ -761,12 +628,8 @@ Return ONLY valid JSON with no markdown formatting or backticks:
                             st.session_state.saved_grammar_explanations.remove(item)
                             st.rerun()
 
-    # ---------------------------------------------------------
-    # TAB 3: Saved Grammar Examples
-    # ---------------------------------------------------------
     with tab_saved_ex:
         st.subheader(f"⭐ Saved Examples ({len(st.session_state.saved_grammar_examples)})")
-
         if not st.session_state.saved_grammar_examples:
             st.info("No examples saved yet. Generate examples in the Practice tab and check the star box to save them.")
         else:
@@ -776,7 +639,6 @@ Return ONLY valid JSON with no markdown formatting or backticks:
                 sentence = item.get("sentence", "")
                 furigana = item.get("furigana", "")
                 translation = item.get("translation", "")
-
                 with st.container(border=True):
                     col_info, col_action = st.columns([0.85, 0.15])
                     with col_info:
@@ -786,7 +648,6 @@ Return ONLY valid JSON with no markdown formatting or backticks:
                         else:
                             st.markdown(f"### {idx}. {sentence}")
                         st.write(f"*Translation:* {translation}")
-
                     with col_action:
                         if st.button("🗑️ Remove", key=f"remove_ex_{idx}"):
                             st.session_state.saved_grammar_examples.remove(item)
@@ -796,7 +657,6 @@ elif page == "Conversation Practice":
     st.title("💬 Conversation Practice & Feedback")
 
     profile = st.session_state.learner_profile
-
     if not profile:
         st.warning("Please complete your Learner Profile first.")
         st.stop()
@@ -818,14 +678,12 @@ elif page == "Conversation Practice":
     def save_current_chat():
         if not st.session_state.messages:
             return
-            
         chat_id = st.session_state.get("current_chat_id")
         if not chat_id:
             chat_id = str(uuid.uuid4())
             st.session_state.current_chat_id = chat_id
             
         first_user_msg = next((msg["content"] for msg in st.session_state.messages if msg["role"] == "user"), None)
-        
         if first_user_msg:
             truncated_topic = first_user_msg[:30] + ("..." if len(first_user_msg) > 30 else "")
             chat_title = f"{truncated_topic} ({target_language})"
@@ -862,7 +720,6 @@ elif page == "Conversation Practice":
         if st.session_state.chat_history_list:
             st.markdown("---")
             st.markdown("**Past Conversations:**")
-            # Displaying reversed list so the most recent chat appears at the top
             for i, past_chat in enumerate(reversed(st.session_state.chat_history_list)):
                 c_id = past_chat.get("id", f"chat_{i}")
                 c_title = past_chat.get("title", f"Chat {i}")
@@ -906,14 +763,12 @@ The current conversation topic is: "{selected_topic}".
 Respond naturally in {target_language}, matching their proficiency level. Keep the conversation engaging and relevant to the topic.
 """
                 api_messages = [{"role": "system", "content": chat_system_prompt}] + st.session_state.messages
-                
                 chat_completion = client.chat.completions.create(
                     messages=api_messages,
                     model="openai/gpt-oss-120b",
                     temperature=0.7
                 )
                 response_text = chat_completion.choices[0].message.content.strip()
-                
                 st.markdown(response_text)
                 st.session_state.messages.append({"role": "assistant", "content": response_text})
                 save_current_chat()
@@ -939,7 +794,6 @@ Respond naturally in {target_language}, matching their proficiency level. Keep t
         else:
             with st.spinner("Analyzing your conversation..."):
                 transcript = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in st.session_state.messages])
-                
                 eval_system_prompt = "You are an expert language teacher providing structured JSON evaluation reports."
                 feedback_prompt = f"""
 Analyze the following conversation transcript between a language learner and an AI tutor.
@@ -977,7 +831,6 @@ Return ONLY valid JSON with no markdown formatting or backticks:
                         response_text = response_text[7:]
                     if response_text.endswith("```"):
                         response_text = response_text[:-3]
-                    
                     st.session_state.feedback_report = json.loads(response_text.strip())
                     save_current_chat()
                 except json.JSONDecodeError:
